@@ -123,9 +123,30 @@
     </div>
   </main>
 
+  <!-- TELEGRAM COMMUNITY MODAL (TRIGGERED AFTER 1ST GENERATION) -->
+  <div id="tgModal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center p-4">
+    <div class="surface-panel max-w-md w-full p-6 text-center border border-zinc-700 shadow-2xl">
+      <div class="w-14 h-14 rounded-full bg-blue-500/20 text-blue-400 mx-auto flex items-center justify-center mb-4">
+        <svg class="w-7 h-7 ml-[-2px]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.19-.08-.05-.19-.02-.27 0-.11.02-1.93 1.23-5.46 3.62-.51.35-.98.52-1.4.51-.46-.01-1.35-.26-2.01-.48-.81-.27-1.46-.42-1.4-.88.03-.24.36-.48.98-.74 3.82-1.66 6.36-2.76 7.63-3.29 3.62-1.52 4.38-1.78 4.88-1.79.11 0 .35.03.48.14.11.09.14.22.15.34-.01.07-.01.21-.02.29z"/></svg>
+      </div>
+      <h2 class="text-lg font-bold text-white mb-2">Get Free Daily Tokens!</h2>
+      <p class="text-sm text-zinc-400 mb-6 leading-relaxed">
+        Join the <strong>VIP Lexis Flow AI</strong> community to get updates on free daily tokens and exclusive access to new AI tools.
+      </p>
+      <div class="flex flex-col gap-3">
+        <button onclick="joinTelegram()" class="w-full py-2.5 rounded-lg text-sm font-bold bg-blue-600 text-white hover:bg-blue-500 transition shadow-lg shadow-blue-500/25">
+          Join t.me/lexisflowai
+        </button>
+        <button onclick="closeTgModal()" class="w-full py-2 text-sm font-medium text-zinc-500 hover:text-zinc-300 transition">
+          Maybe Later
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- TRIAL EXPIRED MODAL -->
   <div id="trialExpiredModal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center p-4">
-    <div class="surface-panel max-w-md w-full p-6 text-center border border-rose-900/50">
+    <div class="surface-panel max-w-md w-full p-6 text-center border border-rose-900/50 shadow-2xl">
       <div class="w-14 h-14 rounded-full bg-rose-500/20 text-rose-500 mx-auto flex items-center justify-center mb-4">
         <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
       </div>
@@ -157,8 +178,28 @@
       const el = document.getElementById('statusMessage'); el.textContent = msg;
       el.className = `text-[11px] font-medium ${type === 'error' ? 'text-red-400' : 'text-zinc-400'}`;
     }
+    
     function updateScriptMetrics() {
       document.getElementById('charCount').textContent = document.getElementById('scriptInput').value.length;
+    }
+
+    // TELEGRAM POP-UP LOGIC
+    function checkTelegramPopup() {
+      if (!localStorage.getItem('lexis_tg_joined')) {
+        document.getElementById('tgModal').classList.remove('hidden');
+      }
+    }
+
+    function joinTelegram() {
+      localStorage.setItem('lexis_tg_joined', 'true');
+      window.open('https://t.me/lexisflowai', '_blank');
+      document.getElementById('tgModal').classList.add('hidden');
+    }
+
+    function closeTgModal() {
+      // If user clicks maybe later, we hide it now, but do NOT set localStorage
+      // This means it will appear again after their next successful generation.
+      document.getElementById('tgModal').classList.add('hidden');
     }
 
     function handleApiError(data) {
@@ -213,7 +254,7 @@
         const id = v.voice_id || v.id; const name = v.display_name || 'Studio Voice';
         const isSelected = selectedVoice.id === id; const previewUrl = v.preview_audio_url || v.preview_audio || '';
         return `
-          <div class="p-3 rounded-lg border flex items-center justify-between transition cursor-pointer ${isSelected ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900'}" onclick="selectVoice('${id}', '${name.replace(/'/g, "\'")}', '${v._mappedKey || ''}')">
+          <div class="p-3 rounded-lg border flex items-center justify-between transition cursor-pointer ${isSelected ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900'}" onclick="selectVoice('${id}', '${name.replace(/'/g, "'")}', '${v._mappedKey || ''}')">
             <div class="flex-1 min-w-0">
               <p class="text-[13px] font-medium text-zinc-200 truncate">${name}</p>
               <div class="flex items-center gap-2 mt-1"><span class="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded capitalize">${v.gender || 'Neural'}</span></div>
@@ -233,7 +274,9 @@
       currentlyPlayingAudio.play();
       currentlyPlayingAudio.onended = () => { resetBtnIcon(btn); currentlyPlayingAudio = null; currentlyPlayingBtn = null; };
     }
+    
     function resetBtnIcon(btn) { if(btn) btn.innerHTML = `<svg class="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`; }
+    
     function selectVoice(id, name, mappedKey) { selectedVoice = { id, name, mappedKey }; document.getElementById('selectedVoiceName').textContent = name; document.getElementById('statusIndicator').classList.replace('bg-zinc-700', 'bg-green-500'); renderVoices(); }
 
     async function generateAudio() {
@@ -260,6 +303,10 @@
         document.getElementById('activeAudioTitle').textContent = selectedVoice.name;
         document.getElementById('activeDownloadBtn').href = audioUrl;
         document.getElementById('mainAudioPlayer').src = audioUrl; document.getElementById('mainAudioPlayer').play();
+        
+        // TRIGGER TELEGRAM POPUP AFTER FIRST SUCCESSFUL GENERATION
+        setTimeout(checkTelegramPopup, 1500);
+
       } catch (err) { 
         setStatus(err.message, 'error'); 
       } finally { 
