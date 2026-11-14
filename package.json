@@ -1,0 +1,9 @@
+{
+  "name": "lexisflow-godmode-gated",
+  "version": "7.0.0",
+  "private": true,
+  "description": "Lexis Flow Premium with Unlimited Admin Token and IP/Trial Limits for Users",
+  "engines": {
+    "node": ">=18.x"
+  }
+}

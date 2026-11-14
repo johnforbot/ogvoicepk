@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en" class="antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lexis Flow Speech | Premium Voice Studio</title>
+  <script defer src="/_vercel/insights/script.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg-main: #09090b; --bg-surface: #18181b; --border-color: #27272a; --text-primary: #fafafa; }
+    body { background-color: var(--bg-main); color: var(--text-primary); font-family: 'Inter', sans-serif; }
+    .mono { font-family: 'Roboto Mono', monospace; }
+    .surface-panel { background-color: var(--bg-surface); border: 1px solid var(--border-color); border-radius: 12px; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #52525b; box-shadow: none; }
+    audio { width: 100%; height: 36px; outline: none; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col relative">
+
+  <header class="border-b border-zinc-800 bg-zinc-950 px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded flex items-center justify-center bg-zinc-900 border border-zinc-800/80 p-1.5">
+        <svg class="w-full h-full" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="lfFlowGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="#0e5a8a" /><stop offset="50%" stop-color="#22d3ee" /><stop offset="100%" stop-color="#fafafa" />
+            </linearGradient>
+          </defs>
+          <path d="M28 20V75H52" stroke="url(#lfFlowGrad)" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M44 20H72" stroke="url(#lfFlowGrad)" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M44 42H64" stroke="url(#lfFlowGrad)" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M44 20C38 35 38 60 44 75" stroke="url(#lfFlowGrad)" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="28" cy="20" r="5" fill="#fafafa" /><circle cx="52" cy="75" r="5" fill="#22d3ee" />
+          <circle cx="72" cy="20" r="5" fill="#22d3ee" /><circle cx="64" cy="42" r="5" fill="#0e5a8a" />
+        </svg>
+      </div>
+      <h1 class="text-sm font-semibold tracking-wide">Lexis Flow Speech</h1>
+    </div>
+    <div class="flex items-center gap-3">
+      <a href="https://t.me/MessageOwner_bot" target="_blank" class="text-xs font-medium text-zinc-400 hover:text-white transition px-3 py-1.5 rounded-md hover:bg-zinc-800">
+        Support
+      </a>
+      <a href="https://t.me/MessageOwner_bot" target="_blank" class="text-xs font-medium bg-zinc-100 text-zinc-900 hover:bg-white transition px-4 py-1.5 rounded-md shadow-sm">
+        Buy Premium Token
+      </a>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-[1400px] w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="lg:col-span-4 flex flex-col gap-6">
+      
+      <!-- TOKEN AUTHENTICATION BOX -->
+      <section class="surface-panel p-5">
+        <h2 class="text-sm font-semibold mb-2">Access Token</h2>
+        <p class="text-[12px] text-zinc-400 mb-3">Enter your premium subscription or trial token to unlock the studio.</p>
+        <input id="accessTokenInput" type="password" placeholder="Enter Token..." class="w-full text-sm bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-white outline-none focus:border-zinc-500 mb-3" />
+        <button onclick="syncLibrary()" id="syncBtn" class="w-full py-2 rounded-lg text-xs font-semibold bg-white text-zinc-950 hover:bg-zinc-200 transition">
+          Unlock & Load Library
+        </button>
+      </section>
+
+      <section class="surface-panel p-5 flex flex-col flex-1 min-h-[400px]">
+        <div class="flex border-b border-zinc-800 mb-3">
+          <button onclick="switchTab('private')" id="tabPrivate" class="px-4 py-2 text-xs font-semibold text-white border-b-2 border-white">Custom Clones</button>
+          <button onclick="switchTab('public')" id="tabPublic" class="px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-300">Default Voices</button>
+        </div>
+        <div class="relative mb-3">
+          <input id="voiceSearchInput" type="text" oninput="renderVoices()" placeholder="Search by name, language..." class="w-full text-[13px] bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-zinc-200 placeholder-zinc-600 outline-none focus:border-zinc-500" />
+        </div>
+        <div id="voiceListContainer" class="flex-1 overflow-y-auto space-y-1.5 pr-1">
+          <div class="h-full flex items-center justify-center text-center px-4">
+            <p class="text-xs text-zinc-500">Enter your access token to explore.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="lg:col-span-8 flex flex-col gap-6">
+      <section class="surface-panel flex flex-col flex-1 min-h-[450px]">
+        <div class="border-b border-zinc-800 p-4 flex items-center justify-between bg-zinc-900/40 rounded-t-xl">
+          <div class="flex items-center gap-3">
+            <div class="w-2.5 h-2.5 rounded-full bg-zinc-700 transition-colors duration-300" id="statusIndicator"></div>
+            <div>
+              <p class="text-[10px] text-zinc-500 uppercase font-semibold">Voice Selected</p>
+              <p class="text-[15px] font-medium text-zinc-100 mt-0.5" id="selectedVoiceName">None Selected</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <select id="languageSelect" class="bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-zinc-300">
+              <option value="auto">Auto-Detect</option><option value="English">English</option><option value="Hindi">Hindi</option>
+            </select>
+            <button id="generateBtn" onclick="generateAudio()" class="px-5 py-2 rounded-lg text-sm font-semibold bg-white text-zinc-950 hover:bg-zinc-200 transition shadow-sm">
+              <span id="generateBtnText">Generate Speech</span>
+            </button>
+          </div>
+        </div>
+        <div class="p-4 flex-1 flex flex-col relative">
+          <textarea id="scriptInput" oninput="updateScriptMetrics()" placeholder="Type your script here..." class="w-full flex-1 bg-transparent text-[16px] leading-relaxed text-zinc-200 placeholder-zinc-700 resize-none outline-none"></textarea>
+          <div class="flex justify-between items-center mt-4 pt-3 border-t border-zinc-800/60">
+            <div class="flex items-center gap-4 text-[11px] mono text-zinc-500">
+              <span><span id="charCount" class="text-zinc-300">0</span> / 5000 chars</span>
+            </div>
+            <div id="statusMessage" class="text-[11px] font-medium text-zinc-400">Ready</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="surface-panel p-5">
+        <h2 class="text-sm font-semibold mb-4">Output</h2>
+        <div id="activeAudioBox" class="hidden bg-zinc-950 border border-zinc-800 rounded-lg p-4 mb-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-sm font-medium" id="activeAudioTitle">Audio Output</span>
+            <a id="activeDownloadBtn" href="#" download="lexis_flow_speech.wav" class="text-[11px] font-semibold bg-zinc-800 text-white hover:bg-zinc-700 px-4 py-1.5 rounded transition">Download WAV</a>
+          </div>
+          <audio id="mainAudioPlayer" controls class="w-full"></audio>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- TRIAL EXPIRED MODAL -->
+  <div id="trialExpiredModal" class="fixed inset-0 z-50 hidden bg-black/80 flex items-center justify-center p-4">
+    <div class="surface-panel max-w-md w-full p-6 text-center border border-rose-900/50">
+      <div class="w-14 h-14 rounded-full bg-rose-500/20 text-rose-500 mx-auto flex items-center justify-center mb-4">
+        <svg class="w-7 h-7" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>
+      </div>
+      <h2 class="text-lg font-bold text-white mb-2">Trial Expired</h2>
+      <p class="text-[13px] text-zinc-400 mb-6 leading-relaxed" id="trialModalMessage">Your 24-hour trial on this device has expired. Purchase a premium plan to enjoy unlimited voices.</p>
+      <div class="flex flex-col gap-3">
+        <a href="https://t.me/MessageOwner_bot" target="_blank" class="w-full block py-2.5 rounded-lg text-sm font-bold bg-white text-black hover:bg-zinc-200 transition">
+          Purchase Premium Plan
+        </a>
+        <button onclick="document.getElementById('trialExpiredModal').classList.add('hidden')" class="w-full py-2 text-sm font-medium text-zinc-500 hover:text-zinc-300 transition">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let globalPrivateVoices = []; let globalPublicVoices = []; let currentTab = 'private';
+    let selectedVoice = { id: '', name: '', mappedKey: '' };
+    let currentlyPlayingAudio = null; let currentlyPlayingBtn = null;
+
+    const tokenInput = document.getElementById('accessTokenInput');
+    if (localStorage.getItem('lexis_token')) tokenInput.value = localStorage.getItem('lexis_token');
+    tokenInput.addEventListener('input', () => {
+      localStorage.setItem('lexis_token', tokenInput.value.trim());
+    });
+
+    function setStatus(msg, type = 'info') {
+      const el = document.getElementById('statusMessage'); el.textContent = msg;
+      el.className = `text-[11px] font-medium ${type === 'error' ? 'text-red-400' : 'text-zinc-400'}`;
+    }
+    function updateScriptMetrics() {
+      document.getElementById('charCount').textContent = document.getElementById('scriptInput').value.length;
+    }
+
+    function handleApiError(data) {
+      if (data.error === 'TRIAL_EXPIRED') {
+        document.getElementById('trialModalMessage').textContent = data.message;
+        document.getElementById('trialExpiredModal').classList.remove('hidden');
+      } else {
+        alert(data.error || 'Authentication Failed');
+      }
+    }
+
+    async function syncLibrary() {
+      const token = tokenInput.value.trim();
+      if (!token) return alert('Please enter a valid Access Token.');
+
+      const btn = document.getElementById('syncBtn'); const container = document.getElementById('voiceListContainer');
+      btn.disabled = true; btn.textContent = 'Authenticating...';
+      container.innerHTML = `<div class="py-12 text-center text-xs text-zinc-500 animate-pulse">Verifying token & device...</div>`;
+      
+      try {
+        const res = await fetch('/api/heygen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'sync_library', accessToken: token }) });
+        const data = await res.json();
+        
+        if (!res.ok) {
+          handleApiError(data);
+          throw new Error(data.error || 'Verification Failed');
+        }
+
+        globalPrivateVoices = data.privateVoices || []; globalPublicVoices = data.publicVoices || [];
+        renderVoices(); setStatus('Library synced successfully.');
+      } catch (err) {
+        container.innerHTML = `<div class="py-6 text-center text-xs text-red-400 px-4">${err.message}</div>`;
+      } finally { btn.disabled = false; btn.textContent = 'Unlock & Load Library'; }
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('tabPrivate').className = tab === 'private' ? 'px-4 py-2 text-xs font-semibold text-white border-b-2 border-white' : 'px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-300';
+      document.getElementById('tabPublic').className = tab === 'public' ? 'px-4 py-2 text-xs font-semibold text-white border-b-2 border-white' : 'px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-300';
+      renderVoices();
+    }
+
+    function renderVoices() {
+      const container = document.getElementById('voiceListContainer');
+      const query = document.getElementById('voiceSearchInput').value.trim().toLowerCase();
+      const list = currentTab === 'private' ? globalPrivateVoices : globalPublicVoices;
+      const filtered = list.filter(v => `${v.display_name} ${v.language} ${v.gender}`.toLowerCase().includes(query));
+
+      if (filtered.length === 0) return container.innerHTML = `<div class="py-6 text-center text-[13px] text-zinc-600">No voices match your search.</div>`;
+
+      container.innerHTML = filtered.map(v => {
+        const id = v.voice_id || v.id; const name = v.display_name || 'Studio Voice';
+        const isSelected = selectedVoice.id === id; const previewUrl = v.preview_audio_url || v.preview_audio || '';
+        return `
+          <div class="p-3 rounded-lg border flex items-center justify-between transition cursor-pointer ${isSelected ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900'}" onclick="selectVoice('${id}', '${name.replace(/'/g, "\'")}', '${v._mappedKey || ''}')">
+            <div class="flex-1 min-w-0">
+              <p class="text-[13px] font-medium text-zinc-200 truncate">${name}</p>
+              <div class="flex items-center gap-2 mt-1"><span class="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded capitalize">${v.gender || 'Neural'}</span></div>
+            </div>
+            ${previewUrl ? `<button id="btn-play-${id}" onclick="event.stopPropagation(); togglePreview('${previewUrl}', 'btn-play-${id}')" class="ml-3 w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-300 hover:bg-white hover:text-black transition"><svg class="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function togglePreview(url, btnId) {
+      const btn = document.getElementById(btnId);
+      if (currentlyPlayingAudio && currentlyPlayingAudio.src === url && !currentlyPlayingAudio.paused) { currentlyPlayingAudio.pause(); resetBtnIcon(btn); return; }
+      if (currentlyPlayingAudio) { currentlyPlayingAudio.pause(); if (currentlyPlayingBtn) resetBtnIcon(currentlyPlayingBtn); }
+      currentlyPlayingAudio = new Audio(url); currentlyPlayingBtn = btn;
+      btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+      currentlyPlayingAudio.play();
+      currentlyPlayingAudio.onended = () => { resetBtnIcon(btn); currentlyPlayingAudio = null; currentlyPlayingBtn = null; };
+    }
+    function resetBtnIcon(btn) { if(btn) btn.innerHTML = `<svg class="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`; }
+    function selectVoice(id, name, mappedKey) { selectedVoice = { id, name, mappedKey }; document.getElementById('selectedVoiceName').textContent = name; document.getElementById('statusIndicator').classList.replace('bg-zinc-700', 'bg-green-500'); renderVoices(); }
+
+    async function generateAudio() {
+      const token = tokenInput.value.trim();
+      const text = document.getElementById('scriptInput').value.trim();
+      const language = document.getElementById('languageSelect').value;
+      
+      if (!token) return alert('Please enter your Access Token in the left panel.');
+      if (!selectedVoice.id) return setStatus('Please select a voice first.', 'error');
+      if (!text) return setStatus('Please enter some text.', 'error');
+      
+      const btn = document.getElementById('generateBtn'); btn.disabled = true; btn.classList.add('opacity-50'); btn.textContent = 'Synthesizing...';
+      try {
+        const res = await fetch('/api/heygen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'generate_tts', accessToken: token, voiceId: selectedVoice.id, mappedKey: selectedVoice.mappedKey, text, language }) });
+        const data = await res.json();
+        
+        if (!res.ok) {
+          handleApiError(data);
+          throw new Error(data.error || 'Generation failed.');
+        }
+
+        const audioUrl = data?.data?.audio_url || data?.audio_url;
+        document.getElementById('activeAudioBox').classList.remove('hidden');
+        document.getElementById('activeAudioTitle').textContent = selectedVoice.name;
+        document.getElementById('activeDownloadBtn').href = audioUrl;
+        document.getElementById('mainAudioPlayer').src = audioUrl; document.getElementById('mainAudioPlayer').play();
+      } catch (err) { 
+        setStatus(err.message, 'error'); 
+      } finally { 
+        btn.disabled = false; btn.classList.remove('opacity-50'); btn.textContent = 'Generate Speech'; 
+      }
+    }
+  </script>
+</body>
+</html>
