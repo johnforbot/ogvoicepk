@@ -5,5 +5,8 @@
   "description": "Lexis Flow Premium with Unlimited Admin Token and IP/Trial Limits for Users",
   "engines": {
     "node": ">=18.x"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
   }
 }
