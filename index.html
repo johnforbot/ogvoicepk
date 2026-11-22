@@ -64,7 +64,7 @@
         </button>
       </section>
 
-      <section class="surface-panel p-5 flex flex-col flex-1 min-h-[400px]">
+      <section class="surface-panel p-5 flex flex-col flex-1 min-h-[400px] max-h-[620px]">
         <div class="flex border-b border-zinc-800 mb-3">
           <button onclick="switchTab('private')" id="tabPrivate" class="px-4 py-2 text-xs font-semibold text-white border-b-2 border-white">Custom Clones</button>
           <button onclick="switchTab('public')" id="tabPublic" class="px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-300">Default Voices</button>
@@ -91,19 +91,16 @@
             </div>
           </div>
           <div class="flex items-center gap-3">
-            <select id="languageSelect" class="bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-zinc-300">
-              <option value="auto">Auto-Detect</option><option value="English">English</option><option value="Hindi">Hindi</option>
-            </select>
             <button id="generateBtn" onclick="generateAudio()" class="px-5 py-2 rounded-lg text-sm font-semibold bg-white text-zinc-950 hover:bg-zinc-200 transition shadow-sm">
               <span id="generateBtnText">Generate Speech</span>
             </button>
           </div>
         </div>
         <div class="p-4 flex-1 flex flex-col relative">
-          <textarea id="scriptInput" oninput="updateScriptMetrics()" placeholder="Type your script here..." class="w-full flex-1 bg-transparent text-[16px] leading-relaxed text-zinc-200 placeholder-zinc-700 resize-none outline-none"></textarea>
+          <textarea id="scriptInput" maxlength="10000" oninput="updateScriptMetrics()" placeholder="Type your script here..." class="w-full flex-1 bg-transparent text-[16px] leading-relaxed text-zinc-200 placeholder-zinc-700 resize-none outline-none"></textarea>
           <div class="flex justify-between items-center mt-4 pt-3 border-t border-zinc-800/60">
             <div class="flex items-center gap-4 text-[11px] mono text-zinc-500">
-              <span><span id="charCount" class="text-zinc-300">0</span> / 5000 chars</span>
+              <span><span id="charCount" class="text-zinc-300">0</span> / 10000 chars</span>
             </div>
             <div id="statusMessage" class="text-[11px] font-medium text-zinc-400">Ready</div>
           </div>
@@ -111,13 +108,23 @@
       </section>
 
       <section class="surface-panel p-5">
-        <h2 class="text-sm font-semibold mb-4">Output</h2>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold">Output</h2>
+          <span id="historyCountBadge" class="hidden text-[11px] text-zinc-500 bg-zinc-800/60 px-2 py-0.5 rounded">0 generated</span>
+        </div>
+
+        <!-- Active Audio Player -->
         <div id="activeAudioBox" class="hidden bg-zinc-950 border border-zinc-800 rounded-lg p-4 mb-4">
-          <div class="flex items-center justify-between mb-3">
-            <span class="text-sm font-medium" id="activeAudioTitle">Audio Output</span>
-            <a id="activeDownloadBtn" href="#" download="lexis_flow_speech.wav" class="text-[11px] font-semibold bg-zinc-800 text-white hover:bg-zinc-700 px-4 py-1.5 rounded transition">Download WAV</a>
+          <div class="flex items-center justify-between mb-3 gap-2">
+            <span class="text-sm font-medium truncate" id="activeAudioTitle">Audio Output</span>
+            <a id="activeDownloadBtn" href="#" download="lexis_flow_speech.wav" class="shrink-0 text-[11px] font-semibold bg-zinc-800 text-white hover:bg-zinc-700 px-4 py-1.5 rounded transition">Download WAV</a>
           </div>
           <audio id="mainAudioPlayer" controls class="w-full"></audio>
+        </div>
+
+        <!-- Session Generated Voices List -->
+        <div id="historyList" class="space-y-2 max-h-64 overflow-y-auto pr-1">
+          <p class="text-xs text-zinc-600 text-center py-4">Generated voices will appear here.</p>
         </div>
       </section>
     </div>
@@ -164,9 +171,13 @@
   </div>
 
   <script>
-    let globalPrivateVoices = []; let globalPublicVoices = []; let currentTab = 'private';
+    let globalPrivateVoices = [];
+    let globalPublicVoices = [];
+    let currentTab = 'private';
     let selectedVoice = { id: '', name: '', mappedKey: '' };
-    let currentlyPlayingAudio = null; let currentlyPlayingBtn = null;
+    let currentlyPlayingAudio = null;
+    let currentlyPlayingBtn = null;
+    let sessionHistory = [];
 
     const tokenInput = document.getElementById('accessTokenInput');
     if (localStorage.getItem('lexis_token')) tokenInput.value = localStorage.getItem('lexis_token');
@@ -174,11 +185,21 @@
       localStorage.setItem('lexis_token', tokenInput.value.trim());
     });
 
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     function setStatus(msg, type = 'info') {
-      const el = document.getElementById('statusMessage'); el.textContent = msg;
+      const el = document.getElementById('statusMessage');
+      el.textContent = msg;
       el.className = `text-[11px] font-medium ${type === 'error' ? 'text-red-400' : 'text-zinc-400'}`;
     }
-    
+
     function updateScriptMetrics() {
       document.getElementById('charCount').textContent = document.getElementById('scriptInput').value.length;
     }
@@ -197,17 +218,15 @@
     }
 
     function closeTgModal() {
-      // If user clicks maybe later, we hide it now, but do NOT set localStorage
-      // This means it will appear again after their next successful generation.
       document.getElementById('tgModal').classList.add('hidden');
     }
 
     function handleApiError(data) {
-      if (data.error === 'TRIAL_EXPIRED') {
+      if (data && data.error === 'TRIAL_EXPIRED') {
         document.getElementById('trialModalMessage').textContent = data.message;
         document.getElementById('trialExpiredModal').classList.remove('hidden');
       } else {
-        alert(data.error || 'Authentication Failed');
+        alert((data && data.error) || 'Authentication Failed');
       }
     }
 
@@ -215,24 +234,35 @@
       const token = tokenInput.value.trim();
       if (!token) return alert('Please enter a valid Access Token.');
 
-      const btn = document.getElementById('syncBtn'); const container = document.getElementById('voiceListContainer');
-      btn.disabled = true; btn.textContent = 'Authenticating...';
+      const btn = document.getElementById('syncBtn');
+      const container = document.getElementById('voiceListContainer');
+      btn.disabled = true;
+      btn.textContent = 'Authenticating...';
       container.innerHTML = `<div class="py-12 text-center text-xs text-zinc-500 animate-pulse">Verifying token & device...</div>`;
-      
+
       try {
-        const res = await fetch('/api/heygen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'sync_library', accessToken: token }) });
+        const res = await fetch('/api/heygen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'sync_library', accessToken: token })
+        });
         const data = await res.json();
-        
+
         if (!res.ok) {
           handleApiError(data);
           throw new Error(data.error || 'Verification Failed');
         }
 
-        globalPrivateVoices = data.privateVoices || []; globalPublicVoices = data.publicVoices || [];
-        renderVoices(); setStatus('Library synced successfully.');
+        globalPrivateVoices = data.privateVoices || [];
+        globalPublicVoices = data.publicVoices || [];
+        renderVoices();
+        setStatus('Library synced successfully.');
       } catch (err) {
-        container.innerHTML = `<div class="py-6 text-center text-xs text-red-400 px-4">${err.message}</div>`;
-      } finally { btn.disabled = false; btn.textContent = 'Unlock & Load Library'; }
+        container.innerHTML = `<div class="py-6 text-center text-xs text-red-400 px-4">${escapeHtml(err.message)}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Unlock & Load Library';
+      }
     }
 
     function switchTab(tab) {
@@ -248,69 +278,326 @@
       const list = currentTab === 'private' ? globalPrivateVoices : globalPublicVoices;
       const filtered = list.filter(v => `${v.display_name} ${v.language} ${v.gender}`.toLowerCase().includes(query));
 
-      if (filtered.length === 0) return container.innerHTML = `<div class="py-6 text-center text-[13px] text-zinc-600">No voices match your search.</div>`;
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="py-6 text-center text-[13px] text-zinc-600">No voices match your search.</div>`;
+        return;
+      }
 
       container.innerHTML = filtered.map(v => {
-        const id = v.voice_id || v.id; const name = v.display_name || 'Studio Voice';
-        const isSelected = selectedVoice.id === id; const previewUrl = v.preview_audio_url || v.preview_audio || '';
+        const id = v.voice_id || v.id;
+        const name = v.display_name || 'Studio Voice';
+        const isSelected = selectedVoice.id === id;
+        const previewUrl = v.preview_audio_url || v.preview_audio || '';
         return `
-          <div class="p-3 rounded-lg border flex items-center justify-between transition cursor-pointer ${isSelected ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900'}" onclick="selectVoice('${id}', '${name.replace(/'/g, "'")}', '${v._mappedKey || ''}')">
+          <div class="p-3 rounded-lg border flex items-center justify-between transition cursor-pointer ${isSelected ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900'}" onclick="selectVoiceById('${escapeHtml(id)}')">
             <div class="flex-1 min-w-0">
-              <p class="text-[13px] font-medium text-zinc-200 truncate">${name}</p>
-              <div class="flex items-center gap-2 mt-1"><span class="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded capitalize">${v.gender || 'Neural'}</span></div>
+              <p class="text-[13px] font-medium text-zinc-200 truncate">${escapeHtml(name)}</p>
+              <div class="flex items-center gap-2 mt-1"><span class="text-[10px] bg-zinc-800 text-zinc-400 px-1.5 py-0.5 rounded capitalize">${escapeHtml(v.gender || 'Neural')}</span></div>
             </div>
-            ${previewUrl ? `<button id="btn-play-${id}" onclick="event.stopPropagation(); togglePreview('${previewUrl}', 'btn-play-${id}')" class="ml-3 w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-300 hover:bg-white hover:text-black transition"><svg class="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>` : ''}
+            ${previewUrl ? `<button id="btn-play-${escapeHtml(id)}" onclick="event.stopPropagation(); togglePreview('${escapeHtml(previewUrl)}', 'btn-play-${escapeHtml(id)}')" class="ml-3 w-8 h-8 flex items-center justify-center rounded-full bg-zinc-800 text-zinc-300 hover:bg-white hover:text-black transition"><svg class="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>` : ''}
           </div>
         `;
       }).join('');
     }
 
+    function selectVoiceById(id) {
+      const list = currentTab === 'private' ? globalPrivateVoices : globalPublicVoices;
+      const found = list.find(v => (v.voice_id || v.id) === id);
+      if (!found) return;
+      selectedVoice = {
+        id: found.voice_id || found.id,
+        name: found.display_name || 'Studio Voice',
+        mappedKey: found._mappedKey || ''
+      };
+      document.getElementById('selectedVoiceName').textContent = selectedVoice.name;
+      document.getElementById('statusIndicator').classList.replace('bg-zinc-700', 'bg-green-500');
+      renderVoices();
+    }
+
     function togglePreview(url, btnId) {
       const btn = document.getElementById(btnId);
-      if (currentlyPlayingAudio && currentlyPlayingAudio.src === url && !currentlyPlayingAudio.paused) { currentlyPlayingAudio.pause(); resetBtnIcon(btn); return; }
-      if (currentlyPlayingAudio) { currentlyPlayingAudio.pause(); if (currentlyPlayingBtn) resetBtnIcon(currentlyPlayingBtn); }
-      currentlyPlayingAudio = new Audio(url); currentlyPlayingBtn = btn;
+      if (currentlyPlayingAudio && currentlyPlayingAudio.src === url && !currentlyPlayingAudio.paused) {
+        currentlyPlayingAudio.pause();
+        resetBtnIcon(btn);
+        return;
+      }
+      if (currentlyPlayingAudio) {
+        currentlyPlayingAudio.pause();
+        if (currentlyPlayingBtn) resetBtnIcon(currentlyPlayingBtn);
+      }
+      currentlyPlayingAudio = new Audio(url);
+      currentlyPlayingBtn = btn;
       btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
-      currentlyPlayingAudio.play();
-      currentlyPlayingAudio.onended = () => { resetBtnIcon(btn); currentlyPlayingAudio = null; currentlyPlayingBtn = null; };
+      currentlyPlayingAudio.play().catch(() => resetBtnIcon(btn));
+      currentlyPlayingAudio.onended = () => {
+        resetBtnIcon(btn);
+        currentlyPlayingAudio = null;
+        currentlyPlayingBtn = null;
+      };
     }
-    
-    function resetBtnIcon(btn) { if(btn) btn.innerHTML = `<svg class="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`; }
-    
-    function selectVoice(id, name, mappedKey) { selectedVoice = { id, name, mappedKey }; document.getElementById('selectedVoiceName').textContent = name; document.getElementById('statusIndicator').classList.replace('bg-zinc-700', 'bg-green-500'); renderVoices(); }
+
+    function resetBtnIcon(btn) {
+      if (btn) btn.innerHTML = `<svg class="w-3.5 h-3.5 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+    }
+
+    // SMART SCRIPT SPLITTER (<= 5000 = 1 chunk; > 5000 = clean sentence split)
+    function splitScript(text, maxChunk = 4800) {
+      if (text.length <= 5000) return [text];
+      const chunks = [];
+      let remaining = text.trim();
+      while (remaining.length > maxChunk) {
+        let slice = remaining.slice(0, maxChunk);
+        let splitIdx = Math.max(
+          slice.lastIndexOf('. '),
+          slice.lastIndexOf('। '),
+          slice.lastIndexOf('? '),
+          slice.lastIndexOf('! '),
+          slice.lastIndexOf('\n')
+        );
+        if (splitIdx < maxChunk * 0.5) {
+          splitIdx = slice.lastIndexOf(' ');
+        }
+        if (splitIdx <= 0) splitIdx = maxChunk;
+        else splitIdx += 1;
+
+        chunks.push(remaining.slice(0, splitIdx).trim());
+        remaining = remaining.slice(splitIdx).trim();
+      }
+      if (remaining.length > 0) chunks.push(remaining);
+      return chunks;
+    }
+
+    // BROWSER-SIDE WAV MERGER (Combines multiple audio chunks into 1 single WAV)
+    async function mergeAudioUrlsToWav(urls) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      const audioCtx = new AudioCtx();
+      try {
+        const decodedBuffers = [];
+        for (const url of urls) {
+          const resp = await fetch(url);
+          if (!resp.ok) throw new Error('Audio fetch failed');
+          const arrBuf = await resp.arrayBuffer();
+          const decoded = await audioCtx.decodeAudioData(arrBuf);
+          decodedBuffers.push(decoded);
+        }
+
+        const numChannels = decodedBuffers[0].numberOfChannels;
+        const sampleRate = decodedBuffers[0].sampleRate;
+        const totalFrames = decodedBuffers.reduce((acc, b) => acc + b.length, 0);
+        const dataByteLength = totalFrames * numChannels * 2;
+        const wavBuffer = new ArrayBuffer(44 + dataByteLength);
+        const view = new DataView(wavBuffer);
+
+        const writeString = (offset, s) => {
+          for (let i = 0; i < s.length; i++) view.setUint8(offset + i, s.charCodeAt(i));
+        };
+
+        writeString(0, 'RIFF');
+        view.setUint32(4, 36 + dataByteLength, true);
+        writeString(8, 'WAVE');
+        writeString(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, numChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * numChannels * 2, true);
+        view.setUint16(32, numChannels * 2, true);
+        view.setUint16(34, 16, true);
+        writeString(36, 'data');
+        view.setUint32(40, dataByteLength, true);
+
+        let offset = 44;
+        for (const buf of decodedBuffers) {
+          const channels = [];
+          for (let c = 0; c < numChannels; c++) {
+            channels.push(buf.getChannelData(Math.min(c, buf.numberOfChannels - 1)));
+          }
+          for (let i = 0; i < buf.length; i++) {
+            for (let c = 0; c < numChannels; c++) {
+              const sample = Math.max(-1, Math.min(1, channels[c][i]));
+              view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+              offset += 2;
+            }
+          }
+        }
+
+        return URL.createObjectURL(new Blob([wavBuffer], { type: 'audio/wav' }));
+      } finally {
+        audioCtx.close().catch(() => {});
+      }
+    }
+
+    function playFromHistory(index) {
+      const item = sessionHistory[index];
+      if (!item) return;
+      const player = document.getElementById('mainAudioPlayer');
+      player.onended = null;
+      document.getElementById('activeAudioBox').classList.remove('hidden');
+      document.getElementById('activeAudioTitle').textContent = item.title;
+      document.getElementById('activeDownloadBtn').href = item.url;
+      document.getElementById('activeDownloadBtn').download = item.filename;
+      player.src = item.url;
+      player.play().catch(() => {});
+    }
+
+    function renderHistory() {
+      const container = document.getElementById('historyList');
+      const badge = document.getElementById('historyCountBadge');
+
+      if (sessionHistory.length === 0) {
+        badge.classList.add('hidden');
+        container.innerHTML = `<p class="text-xs text-zinc-600 text-center py-4">Generated voices will appear here.</p>`;
+        return;
+      }
+
+      badge.classList.remove('hidden');
+      badge.textContent = `${sessionHistory.length} generated`;
+
+      container.innerHTML = sessionHistory.map((item, idx) => `
+        <div class="p-3 bg-zinc-950/80 border border-zinc-800 rounded-lg flex items-center justify-between gap-3 hover:border-zinc-700 transition">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <p class="text-[13px] font-medium text-zinc-100 truncate">${escapeHtml(item.title)}</p>
+              <span class="text-[10px] text-zinc-500 shrink-0">${escapeHtml(item.time)}</span>
+            </div>
+            <p class="text-[11px] text-zinc-500 truncate mt-0.5">${escapeHtml(item.snippet)}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button onclick="playFromHistory(${idx})" class="text-[11px] font-medium px-3 py-1.5 rounded bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition">
+              Play
+            </button>
+            <a href="${escapeHtml(item.url)}" download="${escapeHtml(item.filename)}" class="text-[11px] font-semibold px-3 py-1.5 rounded bg-white text-zinc-950 hover:bg-zinc-200 transition">
+              Download WAV
+            </a>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    async function requestSingleChunk(token, chunkText) {
+      const res = await fetch('/api/heygen', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate_tts',
+          accessToken: token,
+          voiceId: selectedVoice.id,
+          mappedKey: selectedVoice.mappedKey,
+          text: chunkText,
+          language: 'auto'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const err = new Error(data.error || 'Generation failed.');
+        err.apiData = data;
+        throw err;
+      }
+      const audioUrl = data?.data?.audio_url || data?.audio_url;
+      if (!audioUrl) throw new Error('No audio URL returned.');
+      return audioUrl;
+    }
 
     async function generateAudio() {
       const token = tokenInput.value.trim();
       const text = document.getElementById('scriptInput').value.trim();
-      const language = document.getElementById('languageSelect').value;
-      
+
       if (!token) return alert('Please enter your Access Token in the left panel.');
       if (!selectedVoice.id) return setStatus('Please select a voice first.', 'error');
       if (!text) return setStatus('Please enter some text.', 'error');
-      
-      const btn = document.getElementById('generateBtn'); btn.disabled = true; btn.classList.add('opacity-50'); btn.textContent = 'Synthesizing...';
+      if (text.length > 10000) return setStatus('Maximum limit is 10,000 characters.', 'error');
+
+      const btn = document.getElementById('generateBtn');
+      btn.disabled = true;
+      btn.classList.add('opacity-50');
+      btn.textContent = 'Synthesizing...';
+
+      const chunks = splitScript(text, 4800);
+      setStatus(chunks.length > 1 ? `Synthesizing long script (${chunks.length} parts)...` : 'Synthesizing speech...');
+
       try {
-        const res = await fetch('/api/heygen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'generate_tts', accessToken: token, voiceId: selectedVoice.id, mappedKey: selectedVoice.mappedKey, text, language }) });
-        const data = await res.json();
-        
-        if (!res.ok) {
-          handleApiError(data);
-          throw new Error(data.error || 'Generation failed.');
+        // Generate all chunks in parallel for maximum speed
+        const audioUrls = await Promise.all(chunks.map(chunk => requestSingleChunk(token, chunk)));
+
+        const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const safeFileBase = selectedVoice.name.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'lexis_flow_speech';
+        const snippet = text.length > 65 ? text.slice(0, 65) + '...' : text;
+
+        let finalUrl = audioUrls[0];
+        let mergedSuccess = false;
+
+        if (audioUrls.length === 1) {
+          mergedSuccess = true;
+        } else {
+          setStatus('Combining audio...');
+          try {
+            finalUrl = await mergeAudioUrlsToWav(audioUrls);
+            mergedSuccess = true;
+          } catch (mergeErr) {
+            // Fallback if HeyGen CDN blocks CORS fetch: list each part cleanly without any error
+            mergedSuccess = false;
+          }
         }
 
-        const audioUrl = data?.data?.audio_url || data?.audio_url;
-        document.getElementById('activeAudioBox').classList.remove('hidden');
-        document.getElementById('activeAudioTitle').textContent = selectedVoice.name;
-        document.getElementById('activeDownloadBtn').href = audioUrl;
-        document.getElementById('mainAudioPlayer').src = audioUrl; document.getElementById('mainAudioPlayer').play();
-        
-        // TRIGGER TELEGRAM POPUP AFTER FIRST SUCCESSFUL GENERATION
-        setTimeout(checkTelegramPopup, 1500);
+        const player = document.getElementById('mainAudioPlayer');
+        player.onended = null;
 
-      } catch (err) { 
-        setStatus(err.message, 'error'); 
-      } finally { 
-        btn.disabled = false; btn.classList.remove('opacity-50'); btn.textContent = 'Generate Speech'; 
+        if (mergedSuccess) {
+          const item = {
+            title: selectedVoice.name,
+            url: finalUrl,
+            filename: `${safeFileBase}_${Date.now()}.wav`,
+            time: timeLabel,
+            snippet
+          };
+          sessionHistory.unshift(item);
+          renderHistory();
+
+          document.getElementById('activeAudioBox').classList.remove('hidden');
+          document.getElementById('activeAudioTitle').textContent = item.title;
+          document.getElementById('activeDownloadBtn').href = item.url;
+          document.getElementById('activeDownloadBtn').download = item.filename;
+          player.src = item.url;
+          player.play().catch(() => {});
+        } else {
+          // Add parts in reverse so Part 1 appears above Part 2 in history
+          for (let i = audioUrls.length - 1; i >= 0; i--) {
+            sessionHistory.unshift({
+              title: `${selectedVoice.name} (Part ${i + 1}/${audioUrls.length})`,
+              url: audioUrls[i],
+              filename: `${safeFileBase}_part${i + 1}_${Date.now()}.wav`,
+              time: timeLabel,
+              snippet: chunks[i].slice(0, 65) + (chunks[i].length > 65 ? '...' : '')
+            });
+          }
+          renderHistory();
+
+          // Auto-play Part 1 then seamlessly play next parts
+          let currentPart = 0;
+          const playPart = (idx) => {
+            document.getElementById('activeAudioBox').classList.remove('hidden');
+            document.getElementById('activeAudioTitle').textContent = `${selectedVoice.name} (Part ${idx + 1}/${audioUrls.length})`;
+            document.getElementById('activeDownloadBtn').href = audioUrls[idx];
+            document.getElementById('activeDownloadBtn').download = `${safeFileBase}_part${idx + 1}.wav`;
+            player.src = audioUrls[idx];
+            player.play().catch(() => {});
+          };
+          player.onended = () => {
+            currentPart++;
+            if (currentPart < audioUrls.length) playPart(currentPart);
+          };
+          playPart(0);
+        }
+
+        setStatus('Generation complete.');
+        setTimeout(checkTelegramPopup, 1500);
+      } catch (err) {
+        if (err.apiData) handleApiError(err.apiData);
+        setStatus(err.message || 'Generation failed.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('opacity-50');
+        btn.textContent = 'Generate Speech';
       }
     }
   </script>
