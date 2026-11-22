@@ -1,6 +1,7 @@
 // ============================================================================
-// LEXIS FLOW PREMIUM - UNLIMITED KEY POOL BACKEND
-// Loads keys from api/_keys.js (No 4KB Vercel Env Limit) + Optimized Sync
+// LEXIS FLOW PREMIUM - SECURE KEY-INDEX BACKEND
+// Features: Zero Client-Side Key Exposure (_keyIndex), api/_keys.js + Env Pool,
+//           3-IP Device Limit, 24-Hour Trial Expiry, Unlimited Admin Token
 // ============================================================================
 
 const HEYGEN_BASE_URL = 'https://api.heygen.com/v3/models/audio';
@@ -17,23 +18,24 @@ if (!global.tokenIpBindings) global.tokenIpBindings = new Map();
 if (!global.trialIpTimestamps) global.trialIpTimestamps = new Map();
 
 function syncAllKeys() {
-  // 1. Load from api/_keys.js
   if (Array.isArray(FILE_KEYS)) {
     FILE_KEYS.forEach(k => {
       const clean = String(k || '').trim();
       if (clean.length >= 10) global.masterKeyPool.add(clean);
     });
   }
-  // 2. Also support any extra keys in Vercel Env (optional)
-  const envKeys = (process.env.MASTER_KEY_POOL || '').split(',').map(k => k.trim()).filter(k => k.length >= 10);
+  const envKeys = (process.env.MASTER_KEY_POOL || '')
+    .split(',')
+    .map(k => k.trim())
+    .filter(k => k.length >= 10);
   envKeys.forEach(k => global.masterKeyPool.add(k));
 }
 
 function cleanVoiceName(originalName) {
-  if (!originalName) return "Studio Voice";
+  if (!originalName) return 'Studio Voice';
   let name = String(originalName).trim();
-  if (name.length > 25) name = name.substring(0, 22) + "...";
-  if (/^[a-z]+$/.test(name) && name.length > 8) return "Custom Neural Clone";
+  if (name.length > 25) name = name.substring(0, 22) + '...';
+  if (/^[a-z]+$/.test(name) && name.length > 8) return 'Custom Neural Clone';
   return name.replace(/\b\w/g, char => char.toUpperCase());
 }
 
@@ -53,18 +55,23 @@ async function aggregatePrivateVoices() {
   if (keys.length === 0) return { error: 'System offline. Admin must configure Keys.' };
 
   const allVoices = [];
-  const fetchPromises = keys.map(async (key) => {
+  const fetchPromises = keys.map(async (key, index) => {
     try {
       const response = await fetchWithTimeout(`${HEYGEN_BASE_URL}/voices`, {
         headers: { 'X-Api-Key': key, 'Accept': 'application/json' }
       });
       if (response.ok) {
         const data = await response.json();
-        const voices = Array.isArray(data?.data?.voices) ? data.data.voices : (Array.isArray(data?.data) ? data.data : []);
+        const voices = Array.isArray(data?.data?.voices)
+          ? data.data.voices
+          : (Array.isArray(data?.data) ? data.data : []);
         voices.forEach(v => {
           if (!v.status || v.status === 'ACTIVE') {
-            v.display_name = cleanVoiceName(v.name || v.display_name);
-            allVoices.push({ ...v, _mappedKey: key });
+            allVoices.push({
+              ...v,
+              display_name: cleanVoiceName(v.name || v.display_name),
+              _keyIndex: index
+            });
           }
         });
       }
@@ -96,11 +103,17 @@ async function fetchPublicVoices() {
       });
       if (response.ok) {
         const data = await response.json();
-        const voices = Array.isArray(data?.data?.voices) ? data.data.voices : (Array.isArray(data?.data) ? data.data : []);
+        const voices = Array.isArray(data?.data?.voices)
+          ? data.data.voices
+          : (Array.isArray(data?.data) ? data.data : []);
         return {
           voices: voices
             .filter(v => !v.status || v.status === 'ACTIVE')
-            .map(v => ({ ...v, display_name: cleanVoiceName(v.name || v.display_name), _mappedKey: '' }))
+            .map(v => ({
+              ...v,
+              display_name: cleanVoiceName(v.name || v.display_name),
+              _keyIndex: null
+            }))
         };
       }
     } catch (e) {}
@@ -109,7 +122,9 @@ async function fetchPublicVoices() {
 }
 
 function getClientIp(req) {
-  return req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection?.remoteAddress || 'unknown-ip';
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) return String(forwarded).split(',')[0].trim();
+  return req.headers['x-real-ip'] || req.connection?.remoteAddress || 'unknown-ip';
 }
 
 module.exports = async function handler(req, res) {
@@ -117,13 +132,20 @@ module.exports = async function handler(req, res) {
   syncAllKeys();
 
   try {
-    const { action, voiceId, mappedKey, text, language, accessToken } = req.body || {};
+    const { action, voiceId, keyIndex, text, language, accessToken } = req.body || {};
     const clientIp = getClientIp(req);
     const token = (accessToken || '').trim();
 
+    // ========================================================================
+    // AUTHENTICATION & ACCESS CONTROL
+    // ========================================================================
     const MASTER_UNLIMITED_TOKEN = process.env.ADMIN_UNLIMITED_TOKEN || 'pranav_master_99';
-    const validTokens = (process.env.VALID_ACCESS_TOKENS || 'trial').split(',').map(t => t.trim());
-    const isUnlimitedAdmin = (token === MASTER_UNLIMITED_TOKEN);
+    const validTokens = (process.env.VALID_ACCESS_TOKENS || 'trial')
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+
+    const isUnlimitedAdmin = token === MASTER_UNLIMITED_TOKEN;
 
     if (!isUnlimitedAdmin && !validTokens.includes(token)) {
       return res.status(403).json({ error: 'Access Denied: Invalid or Expired Subscription Token.' });
@@ -154,6 +176,7 @@ module.exports = async function handler(req, res) {
         }
       }
     }
+    // ========================================================================
 
     if (action === 'sync_library') {
       const [privateResult, publicResult] = await Promise.all([
@@ -161,18 +184,29 @@ module.exports = async function handler(req, res) {
         fetchPublicVoices()
       ]);
       if (privateResult.error) return res.status(500).json(privateResult);
-      return res.status(200).json({ privateVoices: privateResult.voices, publicVoices: publicResult.voices });
+      return res.status(200).json({
+        privateVoices: privateResult.voices,
+        publicVoices: publicResult.voices
+      });
     }
 
     if (action === 'generate_tts') {
       if (!voiceId || !text) return res.status(400).json({ error: 'Missing voice ID or script.' });
 
       const keys = Array.from(global.masterKeyPool);
-      // Random key rotation for public voices; exact mappedKey for private clones
-      const executionKey = mappedKey || keys[Math.floor(Math.random() * keys.length)];
-      if (!executionKey) return res.status(500).json({ error: 'Service unavailable.' });
+      if (keys.length === 0) return res.status(500).json({ error: 'Service unavailable.' });
 
-      const payload = { model: 'heygen-voice-1-turbo-free', voice_id: String(voiceId).trim(), text: String(text).trim() };
+      // Resolve key strictly server-side using numeric index; random fallback for public voices
+      const hasValidIndex = Number.isInteger(keyIndex) && keyIndex >= 0 && keyIndex < keys.length;
+      const executionKey = hasValidIndex
+        ? keys[keyIndex]
+        : keys[Math.floor(Math.random() * keys.length)];
+
+      const payload = {
+        model: 'heygen-voice-1-turbo-free',
+        voice_id: String(voiceId).trim(),
+        text: String(text).trim()
+      };
       if (language && language !== 'auto') payload.language = language;
 
       const response = await fetch(`${HEYGEN_BASE_URL}/tts`, {
@@ -182,7 +216,11 @@ module.exports = async function handler(req, res) {
       });
       const data = await response.json();
 
-      if (!response.ok) return res.status(response.status).json({ error: data?.message || data?.error?.message || 'Generation failed.' });
+      if (!response.ok) {
+        return res.status(response.status).json({
+          error: data?.message || data?.error?.message || 'Generation failed.'
+        });
+      }
       return res.status(200).json(data);
     }
 
