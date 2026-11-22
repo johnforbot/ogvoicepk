@@ -92,7 +92,7 @@
           </div>
           <div class="flex items-center gap-3">
             <button id="generateBtn" onclick="generateAudio()" class="px-5 py-2 rounded-lg text-sm font-semibold bg-white text-zinc-950 hover:bg-zinc-200 transition shadow-sm">
-              <span id="generateBtnText">Generate Speech</span>
+              Generate Speech
             </button>
           </div>
         </div>
@@ -174,7 +174,7 @@
     let globalPrivateVoices = [];
     let globalPublicVoices = [];
     let currentTab = 'private';
-    let selectedVoice = { id: '', name: '', mappedKey: '' };
+    let selectedVoice = { id: '', name: '', keyIndex: null };
     let currentlyPlayingAudio = null;
     let currentlyPlayingBtn = null;
     let sessionHistory = [];
@@ -307,7 +307,7 @@
       selectedVoice = {
         id: found.voice_id || found.id,
         name: found.display_name || 'Studio Voice',
-        mappedKey: found._mappedKey || ''
+        keyIndex: typeof found._keyIndex === 'number' ? found._keyIndex : null
       };
       document.getElementById('selectedVoiceName').textContent = selectedVoice.name;
       document.getElementById('statusIndicator').classList.replace('bg-zinc-700', 'bg-green-500');
@@ -482,7 +482,7 @@
           action: 'generate_tts',
           accessToken: token,
           voiceId: selectedVoice.id,
-          mappedKey: selectedVoice.mappedKey,
+          keyIndex: selectedVoice.keyIndex,
           text: chunkText,
           language: 'auto'
         })
@@ -516,7 +516,6 @@
       setStatus(chunks.length > 1 ? `Synthesizing long script (${chunks.length} parts)...` : 'Synthesizing speech...');
 
       try {
-        // Generate all chunks in parallel for maximum speed
         const audioUrls = await Promise.all(chunks.map(chunk => requestSingleChunk(token, chunk)));
 
         const timeLabel = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -534,7 +533,6 @@
             finalUrl = await mergeAudioUrlsToWav(audioUrls);
             mergedSuccess = true;
           } catch (mergeErr) {
-            // Fallback if HeyGen CDN blocks CORS fetch: list each part cleanly without any error
             mergedSuccess = false;
           }
         }
@@ -560,7 +558,6 @@
           player.src = item.url;
           player.play().catch(() => {});
         } else {
-          // Add parts in reverse so Part 1 appears above Part 2 in history
           for (let i = audioUrls.length - 1; i >= 0; i--) {
             sessionHistory.unshift({
               title: `${selectedVoice.name} (Part ${i + 1}/${audioUrls.length})`,
@@ -572,7 +569,6 @@
           }
           renderHistory();
 
-          // Auto-play Part 1 then seamlessly play next parts
           let currentPart = 0;
           const playPart = (idx) => {
             document.getElementById('activeAudioBox').classList.remove('hidden');
